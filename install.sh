@@ -5,7 +5,7 @@ set -e
 
 SKILL_NAME="citation-verification"
 INSTALL_DIR="$HOME/.claude/skills/$SKILL_NAME"
-REPO_URL="https://raw.githubusercontent.com/YOUR_USERNAME/citation-verification-skill/main"
+REPO_URL="https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main"
 
 echo "📦 Installing Citation Verification Skill..."
 

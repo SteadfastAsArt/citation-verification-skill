@@ -20,7 +20,7 @@ mkdir -p ~/.claude/skills/citation-verification
 
 # Download the skill
 curl -o ~/.claude/skills/citation-verification/SKILL.md \
-  https://raw.githubusercontent.com/YOUR_USERNAME/citation-verification-skill/main/SKILL.md
+  https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main/SKILL.md
 ```
 
 ### Manual Install
@@ -57,7 +57,7 @@ Claude will automatically:
 
 ## Requirements
 
-This skill works best with the [paper-ladder](https://github.com/YOUR_USERNAME/paper-ladder) library, which provides:
+This skill works best with the [paper-ladder](https://github.com/SteadfastAsArt/paper-ladder) library, which provides:
 - Multi-source academic database clients
 - Async search capabilities
 - Unified Paper data model
@@ -162,14 +162,14 @@ MIT License - see LICENSE file
 
 ## Related Projects
 
-- [paper-ladder](https://github.com/YOUR_USERNAME/paper-ladder) - Academic paper search library
+- [paper-ladder](https://github.com/SteadfastAsArt/paper-ladder) - Academic paper search library
 - [Claude Code](https://github.com/anthropics/claude-code) - Official Anthropic CLI
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/YOUR_USERNAME/citation-verification-skill/issues)
-- Discussions: [GitHub Discussions](https://github.com/YOUR_USERNAME/citation-verification-skill/discussions)
+- Issues: [GitHub Issues](https://github.com/SteadfastAsArt/citation-verification-skill/issues)
+- Discussions: [GitHub Discussions](https://github.com/SteadfastAsArt/citation-verification-skill/discussions)
 
 ---
 
-**Note**: Replace `YOUR_USERNAME` with your actual GitHub username after creating the repository.
+**Repository**: https://github.com/SteadfastAsArt/citation-verification-skill

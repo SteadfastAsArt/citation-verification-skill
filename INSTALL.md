@@ -14,7 +14,7 @@ mkdir -p ~/.claude/skills/citation-verification
 
 # Download the skill
 curl -o ~/.claude/skills/citation-verification/SKILL.md \
-  https://raw.githubusercontent.com/YOUR_USERNAME/citation-verification-skill/main/SKILL.md
+  https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main/SKILL.md
 
 # Install paper-ladder library
 pip install paper-ladder
@@ -25,7 +25,7 @@ pip install paper-ladder
 ```bash
 # Clone to skills directory
 cd ~/.claude/skills
-git clone https://github.com/YOUR_USERNAME/citation-verification-skill.git citation-verification
+git clone https://github.com/SteadfastAsArt/citation-verification-skill.git citation-verification
 
 # Install paper-ladder
 pip install paper-ladder
@@ -33,7 +33,7 @@ pip install paper-ladder
 
 ## Method 3: Manual Download
 
-1. Download `SKILL.md` from [GitHub](https://github.com/YOUR_USERNAME/citation-verification-skill)
+1. Download `SKILL.md` from [GitHub](https://github.com/SteadfastAsArt/citation-verification-skill)
 2. Create directory: `mkdir -p ~/.claude/skills/citation-verification`
 3. Move `SKILL.md` to `~/.claude/skills/citation-verification/SKILL.md`
 4. Install paper-ladder: `pip install paper-ladder`
@@ -79,7 +79,7 @@ chmod -R 755 ~/.claude/skills
 ### Quick Install Method
 ```bash
 curl -o ~/.claude/skills/citation-verification/SKILL.md \
-  https://raw.githubusercontent.com/YOUR_USERNAME/citation-verification-skill/main/SKILL.md
+  https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main/SKILL.md
 ```
 
 ### Git Clone Method
@@ -96,4 +96,4 @@ rm -rf ~/.claude/skills/citation-verification
 
 ---
 
-**Note**: Replace `YOUR_USERNAME` with the actual GitHub username after repository creation.
+**Note**: Replace `SteadfastAsArt` with the actual GitHub username after repository creation.
