@@ -19,11 +19,31 @@ Use this skill when:
 - Validating citation metadata (authors, year, journal, DOI)
 - Detecting suspicious or fabricated papers
 - User provides text with citations to verify
+- User uploads a document and asks to check all references
 
 Do NOT use for:
 - Searching for new papers (use paper-ladder search clients)
 - Generating citations (use citation-management skill)
 - Formatting citations (use citation style guides)
+
+## Extracting Citations from Documents
+
+If user provides a PDF, Markdown, or text file with references:
+
+1. **Use the extraction script** (bundled with this skill):
+   ```bash
+   python ~/.claude/skills/citation-verification/scripts/extract_citations.py <file.pdf>
+   ```
+
+2. **Or extract manually** using paper-ladder:
+   ```python
+   from paper_ladder.extractors import PDFExtractor
+   extractor = PDFExtractor()
+   content = await extractor.extract("paper.pdf")
+   # Then parse citations from content.markdown
+   ```
+
+3. **Then verify** the extracted citations using the protocol below
 
 ## FIRST ACTION REQUIRED
 

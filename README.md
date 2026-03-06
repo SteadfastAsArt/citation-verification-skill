@@ -15,19 +15,32 @@ A systematic skill for verifying academic citations against multiple authoritati
 ### Quick Install (Recommended)
 
 ```bash
-# Create skills directory if it doesn't exist
-mkdir -p ~/.claude/skills/citation-verification
+curl -fsSL https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main/install.sh | bash
+```
+
+This will:
+- Install the skill to `~/.claude/skills/citation-verification/`
+- Download the citation extraction script
+- Install paper-ladder from GitHub
+
+### Manual Install
+
+```bash
+# Create skills directory
+mkdir -p ~/.claude/skills/citation-verification/scripts
 
 # Download the skill
 curl -o ~/.claude/skills/citation-verification/SKILL.md \
   https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main/SKILL.md
+
+# Download extraction script
+curl -o ~/.claude/skills/citation-verification/scripts/extract_citations.py \
+  https://raw.githubusercontent.com/SteadfastAsArt/citation-verification-skill/main/scripts/extract_citations.py
+chmod +x ~/.claude/skills/citation-verification/scripts/extract_citations.py
+
+# Install paper-ladder
+pip install git+https://github.com/SteadfastAsArt/paper-ladder.git
 ```
-
-### Manual Install
-
-1. Create directory: `mkdir -p ~/.claude/skills/citation-verification`
-2. Copy `SKILL.md` to `~/.claude/skills/citation-verification/SKILL.md`
-3. Restart Claude Code
 
 ### Verify Installation
 
@@ -40,6 +53,8 @@ Claude should confirm the skill is loaded.
 
 ## Usage
 
+### Verify Individual Citations
+
 Simply ask Claude Code to verify citations:
 
 ```
@@ -47,6 +62,24 @@ Verify these citations:
 1. Smith et al. (2023). "Transformer models for protein folding." Nature Machine Intelligence, 5(2), 123-135.
 2. Zhang, L. (2024). "Quantum computing applications in drug discovery." arXiv:2401.12345.
 ```
+
+### Verify Citations from a Document
+
+If you have a PDF, Markdown, or text file with references:
+
+**Option 1: Use the extraction script**
+```bash
+python ~/.claude/skills/citation-verification/scripts/extract_citations.py paper.pdf
+```
+
+This will extract all citations and format them for verification. Copy the output and paste into Claude Code.
+
+**Option 2: Ask Claude directly**
+```
+Check all citations in this document: [upload or paste document]
+```
+
+Claude will extract citations and verify them automatically.
 
 Claude will automatically:
 1. Check 3+ academic databases (OpenAlex, Crossref, Semantic Scholar)

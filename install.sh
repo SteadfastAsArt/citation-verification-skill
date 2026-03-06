@@ -11,17 +11,23 @@ echo "📦 Installing Citation Verification Skill..."
 
 # Create skills directory
 mkdir -p "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR/scripts"
 
 # Download SKILL.md
 echo "⬇️  Downloading skill file..."
 curl -fsSL "$REPO_URL/SKILL.md" -o "$INSTALL_DIR/SKILL.md"
 
+# Download extraction script
+echo "⬇️  Downloading citation extraction script..."
+curl -fsSL "$REPO_URL/scripts/extract_citations.py" -o "$INSTALL_DIR/scripts/extract_citations.py"
+chmod +x "$INSTALL_DIR/scripts/extract_citations.py"
+
 # Check if paper-ladder is installed
 if ! python3 -c "import paper_ladder" 2>/dev/null; then
-    echo "⚠️  paper-ladder not found. Installing..."
-    pip3 install paper-ladder || {
+    echo "⚠️  paper-ladder not found. Installing from GitHub..."
+    pip3 install git+https://github.com/SteadfastAsArt/paper-ladder.git || {
         echo "❌ Failed to install paper-ladder. Please install manually:"
-        echo "   pip install paper-ladder"
+        echo "   pip install git+https://github.com/SteadfastAsArt/paper-ladder.git"
         exit 1
     }
 fi
