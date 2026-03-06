@@ -28,22 +28,188 @@ Do NOT use for:
 
 ## Extracting Citations from Documents
 
-If user provides a PDF, Markdown, or text file with references:
+**When user provides a document (PDF, text, or pasted content):**
 
-1. **Use the extraction script** (bundled with this skill):
-   ```bash
-   python ~/.claude/skills/citation-verification/scripts/extract_citations.py <file.pdf>
-   ```
+### Step 1: Extract References Section
 
-2. **Or extract manually** using paper-ladder:
-   ```python
-   from paper_ladder.extractors import PDFExtractor
-   extractor = PDFExtractor()
-   content = await extractor.extract("paper.pdf")
-   # Then parse citations from content.markdown
-   ```
+Use regex or text parsing to find the references/bibliography section:
 
-3. **Then verify** the extracted citations using the protocol below
+```python
+import re
+
+def extract_references_section(text: str) -> str:
+    """Extract the references/bibliography section from document text."""
+    # Common section headers
+    patterns = [
+        r'(?i)^#+\s*References\s*$',
+        r'(?i)^References\s*$',
+        r'(?i)^Bibliography\s*$',
+        r'(?i)^Works Cited\s*$',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, re.MULTILINE)
+        if match:
+            # Return everything after the header
+            return text[match.end():]
+
+    return text  # If no section found, process entire text
+```
+
+### Step 2: Parse Individual Citations
+
+Extract structured citation data:
+
+```python
+def parse_citations(references_text: str) -> list[dict]:
+    """Parse individual citations from references section."""
+    citations = []
+
+    # Split by common patterns (numbered lists, line breaks)
+    lines = references_text.split('\n')
+
+    for line in lines:
+        line = line.strip()
+        if not line or len(line) < 20:
+            continue
+
+        # Remove numbering: "1. ", "[1] ", etc.
+        line = re.sub(r'^\[?\d+\]?\.?\s*', '', line)
+
+        # Extract components using patterns
+        citation = {}
+
+        # Try to extract year
+        year_match = re.search(r'\((\d{4})\)', line)
+        if year_match:
+            citation['year'] = year_match.group(1)
+
+        # Try to extract title (usually in quotes)
+        title_match = re.search(r'"([^"]+)"', line)
+        if title_match:
+            citation['title'] = title_match.group(1)
+
+        # Try to extract DOI
+        doi_match = re.search(r'doi:?\s*(10\.\d+/[^\s]+)', line, re.IGNORECASE)
+        if doi_match:
+            citation['doi'] = doi_match.group(1)
+
+        # Try to extract arXiv ID
+        arxiv_match = re.search(r'arXiv:(\d+\.\d+)', line)
+        if arxiv_match:
+            citation['arxiv'] = arxiv_match.group(1)
+
+        citation['raw'] = line
+        citations.append(citation)
+
+    return citations
+```
+
+### Step 3: Verify Each Citation
+
+Use paper-ladder to verify:
+
+```python
+from paper_ladder.clients import OpenAlexClient, CrossrefClient, SemanticScholarClient
+
+async def verify_citations(citations: list[dict]) -> list[dict]:
+    """Verify each citation against multiple databases."""
+    results = []
+
+    async with OpenAlexClient() as oa, \
+               CrossrefClient() as cr, \
+               SemanticScholarClient() as s2:
+
+        for cite in citations:
+            result = {'citation': cite, 'verification': {}}
+
+            # Build search query
+            if 'doi' in cite:
+                # DOI is most reliable
+                query = cite['doi']
+            elif 'title' in cite:
+                query = f'"{cite["title"]}"'
+            else:
+                # Use raw text as fallback
+                query = cite['raw'][:100]  # Limit length
+
+            # Search all databases
+            try:
+                result['verification']['openalex'] = await oa.search(query, limit=3)
+                result['verification']['crossref'] = await cr.search(query, limit=3)
+                result['verification']['s2'] = await s2.search(query, limit=3)
+            except Exception as e:
+                result['verification']['error'] = str(e)
+
+            results.append(result)
+
+    return results
+```
+
+### Complete Workflow Example
+
+```python
+import asyncio
+from paper_ladder.extractors import PDFExtractor
+
+async def verify_document_citations(file_path: str):
+    """Complete workflow: extract PDF → parse citations → verify."""
+
+    # 1. Extract text from PDF
+    extractor = PDFExtractor()
+    content = await extractor.extract(file_path)
+    text = content.markdown
+
+    # 2. Extract references section
+    refs_section = extract_references_section(text)
+
+    # 3. Parse individual citations
+    citations = parse_citations(refs_section)
+
+    print(f"Found {len(citations)} citations")
+
+    # 4. Verify each citation
+    results = await verify_citations(citations)
+
+    # 5. Generate report (use structured format from protocol below)
+    for i, result in enumerate(results, 1):
+        print(f"\n## Citation {i}: {result['citation'].get('title', 'Unknown')}")
+        # ... follow structured output format ...
+
+    return results
+
+# Usage
+asyncio.run(verify_document_citations("paper.pdf"))
+```
+
+### Quick Hints for Common Scenarios
+
+**Scenario 1: User pastes references section**
+```python
+# They already extracted it, just parse and verify
+citations = parse_citations(user_input)
+results = await verify_citations(citations)
+```
+
+**Scenario 2: User uploads PDF**
+```python
+# Extract → parse → verify
+content = await PDFExtractor().extract(pdf_path)
+refs = extract_references_section(content.markdown)
+citations = parse_citations(refs)
+results = await verify_citations(citations)
+```
+
+**Scenario 3: User provides DOI list**
+```python
+# Direct verification, skip parsing
+dois = ["10.1038/nature14539", "10.1126/science.aaa1234"]
+for doi in dois:
+    papers = await OpenAlexClient().search(doi, limit=1)
+    # Verify metadata...
+```
+
+---
 
 ## FIRST ACTION REQUIRED
 
@@ -94,19 +260,75 @@ This warning:
 - arXiv (preprints: physics, CS, math)
 - bioRxiv/medRxiv (biology/health preprints)
 
+**Code snippet for parallel verification:**
+
 ```python
 from paper_ladder.clients import OpenAlexClient, CrossrefClient, SemanticScholarClient
 
-async def verify_citation(title, authors, year, journal):
+async def verify_citation(title: str, authors: str = None, year: str = None, doi: str = None):
+    """Verify a single citation against multiple databases."""
     results = {}
+
+    # Build search query (DOI is most reliable)
+    if doi:
+        query = doi
+    elif title:
+        query = f'"{title}"'
+    else:
+        raise ValueError("Need at least title or DOI")
 
     # Check all sources in parallel
     async with OpenAlexClient() as oa, \
                CrossrefClient() as cr, \
                SemanticScholarClient() as s2:
-        results['openalex'] = await oa.search(f'"{title}"', limit=5)
-        results['crossref'] = await cr.search(f'"{title}"', limit=5)
-        results['s2'] = await s2.search(f'"{title}"', limit=5)
+
+        # Search each database
+        results['openalex'] = await oa.search(query, limit=5)
+        results['crossref'] = await cr.search(query, limit=5)
+        results['s2'] = await s2.search(query, limit=5)
+
+        # Calculate match quality for each source
+        for source, papers in results.items():
+            if not papers:
+                results[f'{source}_match'] = 'NONE'
+                continue
+
+            best_match = papers[0]  # Top result
+
+            # Compare metadata
+            title_match = title.lower() in best_match.title.lower() if title else False
+            year_match = str(year) == str(best_match.year) if year else False
+
+            # Assign match quality
+            if title_match and year_match:
+                results[f'{source}_match'] = 'EXACT'
+            elif title_match:
+                results[f'{source}_match'] = 'HIGH'
+            else:
+                results[f'{source}_match'] = 'LOW'
+
+    return results
+```
+
+**Batch verification for multiple citations:**
+
+```python
+async def verify_multiple_citations(citations: list[dict]) -> list[dict]:
+    """Verify multiple citations efficiently."""
+    results = []
+
+    async with OpenAlexClient() as oa, \
+               CrossrefClient() as cr, \
+               SemanticScholarClient() as s2:
+
+        for cite in citations:
+            result = {
+                'citation': cite,
+                'openalex': await oa.search(cite.get('title', ''), limit=3),
+                'crossref': await cr.search(cite.get('title', ''), limit=3),
+                's2': await s2.search(cite.get('title', ''), limit=3),
+            }
+            results.append(result)
 
     return results
 ```
@@ -200,6 +422,43 @@ For each citation, verify:
 - Missing authors or wrong order
 - DOI doesn't resolve or points to different paper
 
+**Code snippet for metadata comparison:**
+
+```python
+def compare_metadata(provided: dict, found: dict) -> dict:
+    """Compare provided citation metadata with database results."""
+    discrepancies = []
+
+    # Title comparison (fuzzy match)
+    if 'title' in provided and 'title' in found:
+        title_sim = fuzz.ratio(provided['title'].lower(), found['title'].lower())
+        if title_sim < 80:
+            discrepancies.append(f"Title mismatch (similarity: {title_sim}%)")
+
+    # Year comparison
+    if 'year' in provided and 'year' in found:
+        year_diff = abs(int(provided['year']) - int(found['year']))
+        if year_diff > 0:
+            discrepancies.append(f"Year off by {year_diff} years")
+
+    # Authors comparison
+    if 'authors' in provided and 'authors' in found:
+        provided_authors = set(provided['authors'].lower().split())
+        found_authors = set(a.name.lower() for a in found['authors'])
+        if not provided_authors.intersection(found_authors):
+            discrepancies.append("No author names match")
+
+    # DOI comparison
+    if 'doi' in provided and 'doi' in found:
+        if provided['doi'].lower() != found['doi'].lower():
+            discrepancies.append("DOI mismatch")
+
+    return {
+        'match_quality': 'EXACT' if not discrepancies else 'MEDIUM' if len(discrepancies) < 2 else 'LOW',
+        'discrepancies': discrepancies
+    }
+```
+
 ## Resistance to Pressure
 
 ### Time Pressure
@@ -289,50 +548,129 @@ If user asks about claims:
 
 ## Example Workflow
 
-```python
-from paper_ladder.clients import OpenAlexClient, CrossrefClient, SemanticScholarClient
+**Complete end-to-end example with paper-ladder:**
 
-async def verify_citations(citations: list[dict]):
+```python
+import asyncio
+from paper_ladder.clients import OpenAlexClient, CrossrefClient, SemanticScholarClient
+from paper_ladder.extractors import PDFExtractor
+
+async def verify_document_citations(pdf_path: str):
     """
-    citations = [
-        {"title": "...", "authors": "...", "year": 2023, "journal": "..."},
-        ...
-    ]
+    Complete workflow: Extract PDF → Parse citations → Verify → Report
+
+    Usage:
+        asyncio.run(verify_document_citations("paper.pdf"))
     """
-    results = []
+
+    # Step 1: Extract text from PDF
+    print("📄 Extracting PDF content...")
+    extractor = PDFExtractor()
+    content = await extractor.extract(pdf_path)
+    text = content.markdown
+
+    # Step 2: Extract references section
+    print("🔍 Finding references section...")
+    import re
+    refs_match = re.search(r'(?i)^#+\s*References\s*$', text, re.MULTILINE)
+    if refs_match:
+        refs_text = text[refs_match.end():]
+    else:
+        refs_text = text  # Use entire document if no section found
+
+    # Step 3: Parse individual citations
+    print("📋 Parsing citations...")
+    citations = []
+    for line in refs_text.split('\n'):
+        line = line.strip()
+        if len(line) < 20:
+            continue
+
+        # Remove numbering
+        line = re.sub(r'^\[?\d+\]?\.?\s*', '', line)
+
+        # Extract metadata
+        citation = {'raw': line}
+
+        # Extract year
+        year_match = re.search(r'\((\d{4})\)', line)
+        if year_match:
+            citation['year'] = year_match.group(1)
+
+        # Extract title (in quotes)
+        title_match = re.search(r'"([^"]+)"', line)
+        if title_match:
+            citation['title'] = title_match.group(1)
+
+        # Extract DOI
+        doi_match = re.search(r'doi:?\s*(10\.\d+/[^\s]+)', line, re.IGNORECASE)
+        if doi_match:
+            citation['doi'] = doi_match.group(1)
+
+        citations.append(citation)
+
+    print(f"✅ Found {len(citations)} citations\n")
+
+    # Step 4: Verify each citation
+    print("🔬 Verifying citations against databases...\n")
 
     async with OpenAlexClient() as oa, \
                CrossrefClient() as cr, \
                SemanticScholarClient() as s2:
 
-        for citation in citations:
+        for i, cite in enumerate(citations, 1):
+            print(f"## Citation {i}: {cite.get('title', 'Unknown')[:50]}...")
+
+            # Build search query
+            if 'doi' in cite:
+                query = cite['doi']
+            elif 'title' in cite:
+                query = f'"{cite["title"]}"'
+            else:
+                query = cite['raw'][:100]
+
             # Search all databases
-            query = f'"{citation["title"]}"'
+            oa_results = await oa.search(query, limit=3)
+            cr_results = await cr.search(query, limit=3)
+            s2_results = await s2.search(query, limit=3)
 
-            oa_results = await oa.search(query, limit=5)
-            cr_results = await cr.search(query, limit=5)
-            s2_results = await s2.search(query, limit=5)
+            # Determine match quality
+            if oa_results or cr_results or s2_results:
+                print("✓ Found in databases")
+                # Compare metadata here...
+            else:
+                print("✗ NOT FOUND - Likely fabricated")
 
-            # Calculate match quality
-            match_quality = calculate_match_quality(
-                citation,
-                oa_results,
-                cr_results,
-                s2_results
-            )
+            print()
 
-            # Generate structured report
-            report = generate_verification_report(
-                citation,
-                oa_results,
-                cr_results,
-                s2_results,
-                match_quality
-            )
+    return citations
 
-            results.append(report)
+# Run the verification
+asyncio.run(verify_document_citations("paper.pdf"))
+```
 
-    return results
+**Quick verification of a single citation:**
+
+```python
+async def quick_verify(title: str, year: str = None):
+    """Quick single citation verification."""
+    async with OpenAlexClient() as oa:
+        results = await oa.search(f'"{title}"', limit=1)
+
+        if results:
+            paper = results[0]
+            print(f"✓ Found: {paper.title}")
+            print(f"  Authors: {', '.join(a.name for a in paper.authors[:3])}")
+            print(f"  Year: {paper.year}")
+            print(f"  DOI: {paper.doi}")
+
+            if year and str(paper.year) != str(year):
+                print(f"  ⚠️ Year mismatch: expected {year}, found {paper.year}")
+        else:
+            print("✗ Not found")
+
+# Usage
+asyncio.run(quick_verify("Attention Is All You Need", "2017"))
 ```
 
 ## Real-World Impact
